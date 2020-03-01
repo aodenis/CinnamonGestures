@@ -1352,7 +1352,7 @@ class HyperviewWorkspace {
             }
             else if(event.get_button() === 2)
             {
-                if(global.screen.get_n_workspaces() > 1) //did that mistake once, not twice
+                if((global.screen.get_n_workspaces() > 1) && this.hyperview.workspaceOverviewEnabled) //did that mistake once, not twice
                 {
                     this.renewWorkspaceHoverTarget();
                     this.hyperview.removeWorkspace(this);
@@ -2196,7 +2196,7 @@ class GestureManager {
 
     updateGesture(dx,dy)
     {
-        if(!this.config.windowSwitchDisabled && (this.currentGesture.nf === 3))dx = 0;
+        if(!this.config.windowSwitchEnabled && (this.currentGesture.nf === 3))dx = 0;
         this.currentGesture.x += dx;
         this.currentGesture.y += dy;
         this.currentGesture.ax += Math.abs(dx);

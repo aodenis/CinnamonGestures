@@ -1,5 +1,5 @@
 {
-    "window-switch-disabled": {
+    "window-switch-enabled": {
         "type": "switch",
         "description": "Slide with three fingers to switch between windows",
         "default": false,
