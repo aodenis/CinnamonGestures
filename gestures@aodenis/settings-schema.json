@@ -1,0 +1,8 @@
+{
+    "window-switch-disabled": {
+        "type": "switch",
+        "description": "Slide with three fingers to switch between windows",
+        "default": false,
+        "tooltip": "Broken but working"
+    }
+}

@@ -1,0 +1,13 @@
+[Unit]
+Description=Touchpad Gestures Daemon
+#Documentation=man:gestured(1)
+
+[Service]
+Type=dbus
+BusName=org.aodenis.gestured
+ExecStart=/usr/bin/gestured
+Restart=on-failure
+User=root
+Group=root
+
+[Install]

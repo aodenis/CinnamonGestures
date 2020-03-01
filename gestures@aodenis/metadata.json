@@ -1,0 +1,10 @@
+{
+    "cinnamon-version": [
+        "4.4"
+    ],
+    "description": "Touchpad gestures for Cinnamon",
+    "name": "Gestures",
+    "version": 0.1,
+    "uuid": "gestures@aodenis",
+    "url": "https://github.com/aodenis/CinnamonGestures"
+}

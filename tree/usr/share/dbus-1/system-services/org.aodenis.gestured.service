@@ -1,0 +1,5 @@
+[D-BUS Service]
+Name=org.aodenis.gestured
+Exec=/bin/false
+User=root
+SystemdService=gestured.service
