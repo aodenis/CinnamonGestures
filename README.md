@@ -1,4 +1,7 @@
-CinnamonGestures brings touchpad gestures on Cinnamon Desktop Environment
+CinnamonGestures
+================
+
+CinnamonGestures implements touchpad gestures on Cinnamon Desktop Environment
 
 Caution & License
 =================
@@ -12,6 +15,24 @@ Installation
 CinnamonGestures is made of two distinct parts : a daemon (gestured) and a Cinnamon extension part.
 gestured can be installed with a debian package or built. Its purpose is to send libinput's events into DBus' system bus. It is automatically started by the extension.
 The extension is a directory (gestures@aodenis/) that must be copied in the directory ~/.local/cinnamon/extensions/ on your machine. Once done, you have to activate the extension in Cinnamon (Settings > Extensions).
+
+Building gestured
+=================
+
+Proper instructions will be published in a few days. Along with gestured binary, a few configuration file must be installed on the system. You may find them and their location in *tree* directory.
+Simple instructions :
+```
+git clone https://github.com/aodenis/CinnamonGestures
+cd CinnamonGestures
+apt install libudev-dev libdbus-1-dev libinput-dev libstdc++-7-dev
+make
+```
+
+Installation instructions, USE AT YOUR OWN RISKS :
+```
+sudo make install
+cp -r gestures@aodenis ~/.local/share/cinnamon/extensions/
+```
 
 Use
 ===
