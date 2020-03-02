@@ -153,11 +153,11 @@ function protect(func)
 class SettingsManager {
     constructor()
     {
-        this.devMode = false; // Unused
+        this.devMode = true; // Unused
         this.debugMode = false; // Red square when activated
         this.windowSwitchEnabled = false; // An unfinished feature. Working but visually broken
-        this.debugLogFileDisabled = true; // Barely used, created only if used
-        this.fourFingersCinnamonRestart = false; // Put four fingers, move a bit to trigger events but not too much, wait, Cinnamon restarts
+        this.debugLogFileDisabled = !this.devMode; // Barely used, created only if used
+        this.fourFingersCinnamonRestart = !this.devMode; // Put four fingers, move a bit to trigger events but not too much, wait, Cinnamon restarts
         this.settings = new Settings.ExtensionSettings(this, "gestures@aodenis");
         //this.settings.bindProperty(Settings.BindingDirection.IN, "dev-mode", "devMode", null, null);
         //this.settings.bindProperty(Settings.BindingDirection.IN, "debug-mode", "debugMode", null, null);
@@ -287,6 +287,7 @@ class Progress {
 
     setTarget(n_target)
     {
+        if(n_target === null)logStack();
         this.target = n_target;
         if(this.options.autoPause && (this.target !== this.progress))this.setPaused(false);
         if(this.progress === undefined)
@@ -830,6 +831,7 @@ class HyperviewWindow {
 
     minimize()
     {
+        if(!this.metaWindow.can_minimize())return;
         if(this.minimizerProgress.progress !== 1000000)this.focusInhibition = true;
         this.setMinimizerTarget(1000000);
         this.metaWindow.minimize();
@@ -838,6 +840,7 @@ class HyperviewWindow {
 
     setMinimizerTarget(value)
     {
+        if(!this.metaWindow.can_minimize())return;
         this.minimizerProgress.setTarget(value)
     }
 
@@ -1845,10 +1848,10 @@ class Hyperview {
                     this.metaWorkspaces.push(metaWorkspace);
                     let hyperWorkspace = new HyperviewWorkspace(metaWorkspace, this);
                     this.hyperWorkspaces.push(hyperWorkspace);
+                    this.computeWorkspaceDestinations();
                     this.workspaceSwitchTicker.options.goals.push((global.screen.get_n_workspaces()-1)*1000000);
                     this.workspaceSwitchTicker.fullJumpTo(effectiveProgress, effectiveOldProgress, currentTarget);
                     hyperWorkspace.load();
-                    this.computeWorkspaceDestinations();
                     this.hyperWorkspaces.filter(x=>x.loaded).forEach(x=>x.setDirty(DIRT_TYPE.SELF_POSITION));
                     this.loadWorkspaceThreshold = undefined;
                 }
