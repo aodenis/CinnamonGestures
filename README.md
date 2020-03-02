@@ -63,7 +63,7 @@ You may find settings in Cinnamon's extensions menu and enable there switching b
 Known Bug
 ---------
 
-This extension sometimes hangs and use 100% CPU. In this case, restarting Cinnamon is a good way out.
+This extension sometimes hangs and use 100% CPU. This bug _should_ be fixed, for the fourth time. In this case, restarting Cinnamon is a good way out.
 
 Roadmap
 -------

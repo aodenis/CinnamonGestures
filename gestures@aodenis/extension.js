@@ -471,6 +471,7 @@ class HyperviewWindow {
         
         // Initialize window variables and bind them
 
+        this.onPositionChanged();
         this.minimizedScale = 0.1;
         this.givenDest = {x: this.origX, y: this.origY}
         this.destScale = 1.0;
@@ -478,11 +479,8 @@ class HyperviewWindow {
         this.destPosYProgress = new Progress({float: true, autoPause: true, defaultToUndefined: true, slope: SLOPE_NOT_CONTROLLED, callback: this.onDestPosTick.bind(this), stickAroundTarget: 1});
         this.minimizerProgress = new Progress({autoPause: true, slope: SLOPE_CONTROLLED, callback: this.onMinimizerTick.bind(this), stickAroundTarget: 90, stickAroundGoals: 90, goals: [0,1000000], max: 1000000, min: 0, onPauseChange: this.protect(this.onMinimizerPauseChange)});
         this.realActorConnectionIds = [this.realWindow.connect('position-changed', this.protect(this.onPositionChanged)), this.realWindow.connect('size-changed', this.protect(this.onSizeChanged))];
-        this.onPositionChanged();
         
-        // this.onSizeChanged();
         this.hoverProgress = new Progress({autoPause: true, slope: SLOPE_CONTROLLED, callback: this.onHoverTick.bind(this), stickAroundTarget: 90, stickAroundGoals: 90, goals: [0,1000000], max: 1000000, min: 0});
-        //this.setDirty();
         this.connectionIds = Array();
         this.connectionIds.push(this.actor.connect('motion-event', this.protect(this.motionEvent)));
         this.connectionIds.push(this.actor.connect('leave-event', this.protect(this.leaveEvent)));
