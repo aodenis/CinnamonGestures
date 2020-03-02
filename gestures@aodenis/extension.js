@@ -1164,6 +1164,7 @@ class HyperviewWorkspace {
             if(clone.metaWindow.is_always_on_top())this.views.cloneGroup.set_child_above_sibling(clone.getActor(), null);
         })
         if(_clone.metaWindow.is_always_on_top())this.views.cloneGroup.set_child_above_sibling(_clone.getActor(), null);
+        if(global.screen.get_active_workspace_index() !== this.metaWorkspace.index())mngr.preventNextDefaultWorkspaceEffect = true;
         Main.activateWindow(_clone.metaWindow);
     }
 
