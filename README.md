@@ -20,13 +20,11 @@ The extension is a directory (*gestures@aodenis*) that must be copied in the dir
 Building gestured
 -----------------
 
-Proper instructions will be published in a few days. Along with gestured binary, a few configuration files must be installed on your system. You may find them and their location in *tree* directory.
-
 Simple build instructions
 ```
+apt install libudev-dev libdbus-1-dev libinput-dev libstdc++-7-dev
 git clone https://github.com/aodenis/CinnamonGestures
 cd CinnamonGestures
-apt install libudev-dev libdbus-1-dev libinput-dev libstdc++-7-dev
 make
 ```
 
@@ -37,7 +35,7 @@ cp -r gestures@aodenis ~/.local/share/cinnamon/extensions/
 ```
 
 How to use
----
+----------
 
 Slide three fingers up on your trackpad to display all windows, slide back down to go back to your desktop.
 Slide four fingers up on your trackpad to display all workspaces, slide back down to go back to your desktop.
@@ -55,17 +53,18 @@ You may find settings in Cinnamon's extensions menu and enable there switching b
 Known Bug
 ---------
 
-This extension sometimes hangs and use 100% CPU. In this cases, restarting Cinnamon is a good way out.
+This extension sometimes hangs and use 100% CPU. This should be fixed now, but this bug has shown itself resilient. In this case, restarting Cinnamon is a good way out.
 
 Roadmap
 -------
 
 A proper documentation for this extension will come in the next few days. Then :
 + A button to create new workspaces in workspace overview
-+ Dragging windows to other workspaces
-+ Four fingers down to see the desktop
-+ Finished three finger window switching
++ Possibility to drag windows to other workspaces
++ Four fingers down to show the desktop
++ Finish three finger window switching
 + Support for multiple display
++ Window titles
 + Many glitches and bugs to fix
 
 Contributing
@@ -74,4 +73,5 @@ Contributing
 If you want to help this project, you can :
 + Star/Watch this repository
 + Report bugs by opening an issue
++ Submit pull requests
 + Send me some satoshis : bc1qzyr0tl9t40vgdep3ynudrp88fkyqj2ejva7zwh

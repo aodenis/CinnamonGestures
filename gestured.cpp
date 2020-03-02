@@ -13,20 +13,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// DBus
-
-#include <dbus-1.0/dbus/dbus.h>
 #include <dbus/dbus.h>
-
-// libudev
-
 #include <libudev.h>
-
-// libinput
-
 #include <libinput.h>
-
-// libstdc++
 
 #include <iostream>
 #include <cstring>
@@ -35,14 +24,10 @@
 #include <thread>
 #include <map>
 
-// Linux
-
 #include <fcntl.h>
 #include <sys/poll.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
-// libc6
 
 #include <unistd.h>
 
