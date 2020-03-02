@@ -7,15 +7,25 @@ Caution & License
 -----------------
 
 The version distributed here is a beta version. It still suffers of bugs and glitches and lacks a few features that will be soon added. It is not intended to be used as a final product.
+
 Use at your own risks.
+
 This software is distributed under GNU GPL v3 license. You may find the full text of this license in LICENSE file. 
 
 Installation
 ------------
 
-CinnamonGestures is made of two distinct parts : a daemon (*gestured*) and a Cinnamon extension.
+CinnamonGestures is made of two distinct parts, a daemon (*gestured*) and a Cinnamon extension.
+
 gestured can be installed as a [debian package](https://github.com/aodenis/CinnamonGestures/releases) or be built. Its purpose is to send libinput's events into DBus system bus, allowing the extension to receive it. It is automatically started by the extension and stops by itself.
-The extension is a directory (*gestures@aodenis*) that must be copied in the directory ~/.local/share/cinnamon/extensions/ on your machine. Once done, you have to activate the extension in Cinnamon (Settings > Extensions).
+
+The extension is a directory (*gestures@aodenis*) that must be installed in Cinnamon. Once done, you have to activate the extension in Cinnamon (Settings > Extensions).
+
+```
+git clone https://github.com/aodenis/CinnamonGestures
+cd CinnamonGestures
+cinnamon-install-spice extension gestures@aodenis
+```
 
 Building gestured
 -----------------
@@ -28,10 +38,10 @@ cd CinnamonGestures
 make
 ```
 
-Installation instructions, __USE AT YOUR OWN RISKS__
+Installation instructions __USE AT YOUR OWN RISKS__
 ```
 sudo make install
-cp -r gestures@aodenis ~/.local/share/cinnamon/extensions/
+cinnamon-install-spice extension gestures@aodenis
 ```
 
 How to use
@@ -53,7 +63,7 @@ You may find settings in Cinnamon's extensions menu and enable there switching b
 Known Bug
 ---------
 
-This extension sometimes hangs and use 100% CPU. This should be fixed now, but this bug has shown itself resilient. In this case, restarting Cinnamon is a good way out.
+This extension sometimes hangs and use 100% CPU. In this case, restarting Cinnamon is a good way out.
 
 Roadmap
 -------
