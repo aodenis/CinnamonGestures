@@ -27,6 +27,9 @@ const GLib = imports.gi.GLib;
 const Pango = imports.gi.Pango;
 const Settings = imports.ui.settings;
 
+// Slope : the higher the faster the animation
+// Tau : the lower the faster the animation
+
 const FRAME_RATE = 120;
 const TAU_CONTROLLED = 32; // milliseconds
 const SLOPE_CONTROLLED = 1/TAU_CONTROLLED; //0.5 works (when it's 1000/(FRAME_RATE*TAU_CONTROLLED))
@@ -42,11 +45,11 @@ const WINDOW_SWITCH_FACTOR = 3000;
 const WINDOW_SWITCH_WEIGHT = 3;
 const WORKSPACE_LOAD_THRESHOLD = 0.9;
 const WORKSPACE_CREATION_THRESHOLD = 300000;
-
+const MINIMIZING_WINDOW_SLOPE_FACTOR = 0.8;
 const DEFAULT_SLOT_FRACTION = 0.825;
 const DEFAULT_WORKSPACE_SLOT_FRACTION = 0.95;
 
-const DIRT_TYPE = {WINDOW: 1, WORKSPACE_OVERVIEW: 2, WORKSPACE_SWITCH: 4, FINE_CONTROL: 8, ELEMENT_POSITIONS: 32, WINDOW_SWITCH: 64, HOVER: 128, SELF_POSITION: 256};
+const DIRT_TYPE = {WINDOW: 1, WORKSPACE_OVERVIEW: 2, WORKSPACE_SWITCH: 4, FINE_CONTROL: 8, ELEMENT_POSITIONS: 32, WINDOW_SWITCH: 64, HOVER: 128, SELF_POSITION: 256, RETAIN_COUNT: 512};
 const ANIMATION_DIRECTION = {FORWARD: 1, BACKWARDS: 2};
 
 var last_error = undefined;
@@ -148,6 +151,23 @@ function protect(func)
             print_error(e)
         }
     }).bind(this)
+}
+
+var found_debug_wrong_var = false;
+function debug_check_vars()
+{
+    if(found_debug_wrong_var)return;
+    for(let i = 0; i < arguments.length; i++){
+        let x = arguments[i]
+        if((typeof(x) !== "number")||(isNaN(x)))
+        {
+            logStack();
+            global.logWarning("Variable index : " + i.toString())
+            global.log("Variables :", Object.values(arguments))
+            found_debug_wrong_var = true;
+            break;
+        }
+    }
 }
 
 class SettingsManager {
@@ -278,7 +298,7 @@ class Progress {
         Object.keys(options).forEach((key)=>{
             this.options[key] = options[key];
         });
-        this.paused = !!this.options.autoPause;
+        this.paused = true;
         this.target = this.options.defaultToUndefined?undefined:0;
         this.progress = this.target;
         this.unit_progress = this.progress/1000000;
@@ -289,7 +309,7 @@ class Progress {
     {
         if(n_target === null)logStack();
         this.target = n_target;
-        if(this.options.autoPause && (this.target !== this.progress))this.setPaused(false);
+        if(this.target !== this.progress)this.setPaused(false);
         if(this.progress === undefined)
         {
             this.progress = n_target;
@@ -299,7 +319,7 @@ class Progress {
 
     onTick(time, dt)
     {
-        let {slope, max, min, callback, stickAroundTarget, autoPause, float} = this.options;
+        let {slope, max, min, callback, stickAroundTarget, float} = this.options;
         let new_progress = this.progress;
         if(this.progress !== undefined)
         {
@@ -316,7 +336,7 @@ class Progress {
         this.old_progress = this.progress;
         this.progress = new_progress;
         this.unit_progress = this.progress/1000000;
-        if(autoPause && (new_progress === this.old_progress) && (this.progress === this.target))this.setPaused(true);
+        if((new_progress === this.old_progress) && (this.progress === this.target))this.setPaused(true);
         else callback(new_progress, this.old_progress);
     }
 
@@ -397,7 +417,7 @@ class ModularProgress {
         Object.keys(options).forEach((key)=>{
             this.options[key] = options[key];
         });
-        this.paused = !!this.options.autoPause;
+        this.paused = true;
         this.target = 0;
         this.progress = 0;
         mngr.engine.registerTicker(this);
@@ -406,12 +426,12 @@ class ModularProgress {
     addDelta(delta)
     {
         this.target += delta;
-        if(this.options.autoPause && (this.target !== this.progress))this.setPaused(false);
+        if(this.target !== this.progress)this.setPaused(false);
     }
 
     onTick(time, dt)
     {
-        let {slope, callback, stickAroundTarget, autoPause} = this.options;
+        let {slope, callback, stickAroundTarget} = this.options;
         let new_progress = this.progress;
         new_progress += Math.round(dt*slope*(this.target-this.progress));
         if(Math.abs(new_progress-this.target) <= stickAroundTarget)new_progress = this.target;
@@ -421,7 +441,7 @@ class ModularProgress {
         this.old_progress = this.progress;
         this.progress = new_progress;
         this.unit_progress = this.progress/1000000;
-        if(autoPause && (new_progress === this.old_progress) && (this.decay === 0) && (this.target===new_progress))this.setPaused(true);
+        if((new_progress === this.old_progress) && (this.decay === 0) && (this.target===new_progress))this.setPaused(true);
         else callback(new_progress, this.old_progress, this.decay);
     }
 
@@ -471,16 +491,18 @@ class HyperviewWindow {
         
         // Initialize window variables and bind them
 
-        this.onPositionChanged();
         this.minimizedScale = 0.1;
-        this.givenDest = {x: this.origX, y: this.origY}
         this.destScale = 1.0;
-        this.destPosXProgress = new Progress({float: true, autoPause: true, defaultToUndefined: true, slope: SLOPE_NOT_CONTROLLED, callback: this.onDestPosTick.bind(this), stickAroundTarget: 1});
-        this.destPosYProgress = new Progress({float: true, autoPause: true, defaultToUndefined: true, slope: SLOPE_NOT_CONTROLLED, callback: this.onDestPosTick.bind(this), stickAroundTarget: 1});
-        this.minimizerProgress = new Progress({autoPause: true, slope: SLOPE_CONTROLLED, callback: this.onMinimizerTick.bind(this), stickAroundTarget: 90, stickAroundGoals: 90, goals: [0,1000000], max: 1000000, min: 0, onPauseChange: this.protect(this.onMinimizerPauseChange)});
+        this.thumbnailLocation = {x: -1, y: -1};
+        this.windowLocation = {x: -1, y: -1};
+        this.minimizedLocation = {x: -1, y: -1};
+        this.onPositionChanged();
+        this.destPosXProgress = new Progress({float: true,  defaultToUndefined: true, slope: SLOPE_NOT_CONTROLLED, callback: this.onDestPosTick.bind(this), stickAroundTarget: 1});
+        this.destPosYProgress = new Progress({float: true,  defaultToUndefined: true, slope: SLOPE_NOT_CONTROLLED, callback: this.onDestPosTick.bind(this), stickAroundTarget: 1});
+        this.minimizerProgress = new Progress({ slope: SLOPE_CONTROLLED, callback: this.onMinimizerTick.bind(this), stickAroundTarget: 90, stickAroundGoals: 90, goals: [0, 1000000], max: 1000000, min: 0, onPauseChange: this.protect(this.onMinimizerPauseChange)});
         this.realActorConnectionIds = [this.realWindow.connect('position-changed', this.protect(this.onPositionChanged)), this.realWindow.connect('size-changed', this.protect(this.onSizeChanged))];
         
-        this.hoverProgress = new Progress({autoPause: true, slope: SLOPE_CONTROLLED, callback: this.onHoverTick.bind(this), stickAroundTarget: 90, stickAroundGoals: 90, goals: [0,1000000], max: 1000000, min: 0});
+        this.hoverProgress = new Progress({ slope: SLOPE_CONTROLLED, callback: this.onHoverTick.bind(this), stickAroundTarget: 90, stickAroundGoals: 90, goals: [0,1000000], max: 1000000, min: 0});
         this.connectionIds = Array();
         this.connectionIds.push(this.actor.connect('motion-event', this.protect(this.motionEvent)));
         this.connectionIds.push(this.actor.connect('leave-event', this.protect(this.leaveEvent)));
@@ -538,12 +560,7 @@ class HyperviewWindow {
         this.realActorConnectionIds = Array();
         this.hoverProgress.destroy();
         this.actor.destroy();
-        if(this.hyperviewRetained)
-        {
-            this.hyperviewRetained = false;
-            this.hyperview.waitingMinimizing--;
-            this.hyperview.notifyWaitingWindowCountChanged();
-        }
+        this.releaseHyperview();
     }
 
     getActor()
@@ -559,30 +576,21 @@ class HyperviewWindow {
     // ---- change handlers ----
     onPositionChanged() {
         let geom = new Meta.Rectangle();
+        this.minimizedLocation = {};
+        let actor = this.realWindow;
         if (this.metaWindow.get_icon_geometry(geom))
         {
-            this.minimizedX = geom.x+(geom.width/2)-(this.realWindow.width/2);
-            this.minimizedY = geom.y+(geom.height/2)-(this.realWindow.height/2);
-            let actor = this.realWindow;
+            this.minimizedLocation.x = geom.x+(geom.width/2)-(actor.width/2);
+            this.minimizedLocation.y = geom.y+(geom.height/2)-(actor.height/2);
             this.minimizedScale = ((geom.width / actor.width)<(geom.height / actor.height))?(geom.width / actor.width):(geom.height / actor.height);
         }
         else
         {
-            this.minimizedX = Main.layoutManager.primaryMonitor.width/2-(this.realWindow.width/2);
-            this.minimizedY = Main.layoutManager.primaryMonitor.height-(this.realWindow.height/2);
+            this.minimizedLocation.x = Main.layoutManager.primaryMonitor.width/2-(this.realWindow.width/2);
+            this.minimizedLocation.y = Main.layoutManager.primaryMonitor.height-(this.realWindow.height/2);
             this.minimizedScale = 0.1;
         }
-        if(this.metaWindow.minimized && !this.activated)
-        {
-            this.origX = this.minimizedX;
-            this.origY = this.minimizedY;
-        }
-        else
-        {
-            this.activated = false;
-            this.origX = this.realWindow.x;
-            this.origY = this.realWindow.y;
-        }
+        this.windowLocation = {x: actor.x, y: actor.y};
         this.setDirty();
     }
 
@@ -596,7 +604,7 @@ class HyperviewWindow {
     // ---- Window overview destination setters ----
     setDestination(x, y, destMaxScaleX, destMaxScaleY)
     {
-        this.givenDest = {x: x, y: y};
+        this.thumbnailLocation = {x: x, y: y};
         this.destMaxScaleX = destMaxScaleX;
         this.destMaxScaleY = destMaxScaleY;
 
@@ -607,8 +615,8 @@ class HyperviewWindow {
 
     refreshDestinationVariables()
     {
-        this.destPosXProgress.setTarget(this.givenDest.x-(this.realWindow.width/2));
-        this.destPosYProgress.setTarget(this.givenDest.y-(this.realWindow.height/2));
+        this.destPosXProgress.setTarget(this.thumbnailLocation.x-(this.realWindow.width/2));
+        this.destPosYProgress.setTarget(this.thumbnailLocation.y-(this.realWindow.height/2));
         let ratio1 = this.destMaxScaleX*Main.layoutManager.primaryMonitor.width/this.realWindow.width;
         let ratio2 = this.destMaxScaleY*Main.layoutManager.primaryMonitor.height/this.realWindow.height;
         let old_destScale = this.destScale;
@@ -634,8 +642,8 @@ class HyperviewWindow {
                 // WINDOW IS MINIMIZING
                 let sc = interpolate(1, this.minimizedScale, clamp(1-(1-1.1*m_pr)*(1-1.1*m_pr), 0, 1));
                 this.actor.set_scale(sc, sc);
-                this.actor.set_position(Math.round(interpolate(this.origX, this.minimizedX, m_pr)), Math.round(interpolate(this.origY, this.minimizedY, m_pr*m_pr))); // There for side bar fix, square m_pr should go either for y or x according to bar posiion
-                this.actor.set_opacity(255*(1-m_pr*m_pr));
+                this.actor.set_position(interpolate(this.windowLocation.x, this.minimizedLocation.x, m_pr), interpolate(this.windowLocation.y, this.minimizedLocation.y, m_pr*m_pr));
+                this.actor.set_opacity(clamp(255*(1-0.9*m_pr*m_pr), 0, 255));
             }
             else
             {
@@ -645,7 +653,7 @@ class HyperviewWindow {
                 let rotadv = Math.sin(Math.PI*(this.activeWindowValue/1000000));
                 let sc = interpolate(interpolate(this.metaWindow.minimized?this.minimizedScale:1, rotopt.sc, rotadv*rotadv), this.destScale, w_pr)*(1+w_pr*ADDED_RATIO_HOVER*h_pr);
                 this.actor.set_scale(sc, sc);
-                this.actor.set_position(interpolate(this.origX, this.destPosXProgress.progress, w_pr)+rotadv*rotopt.dx, interpolate(this.origY, this.destPosYProgress.progress, w_pr)+rotadv*rotopt.dy);
+                this.actor.set_position(interpolate(this.metaWindow.minimized?this.minimizedLocation.x:this.windowLocation.x, this.destPosXProgress.progress, w_pr)+rotadv*rotopt.dx, interpolate(this.metaWindow.minimized?this.minimizedLocation.y:this.windowLocation.y, this.destPosYProgress.progress, w_pr)+rotadv*rotopt.dy);
                 if(this.metaWindow.minimized)this.actor.set_opacity(w_pr*255);
                 else this.actor.set_opacity(255);
             }
@@ -665,7 +673,7 @@ class HyperviewWindow {
         if(value)
         {
             this.actor.set_scale(1, 1);
-            this.actor.set_position(this.origX, this.origY);
+            this.actor.set_position(this.windowLocation.x, this.windowLocation.y);
         }
     }
 
@@ -753,7 +761,7 @@ class HyperviewWindow {
     setIsFocusClone(value)
     {
         this.isFocusClone = value;
-        this.minimizerProgress.options.slope = (this.isFocusClone && this.hyperview.isFineControlled)?SLOPE_CONTROLLED:SLOPE_NOT_CONTROLLED;
+        this.minimizerProgress.options.slope = ((this.isFocusClone && this.hyperview.isFineControlled)?SLOPE_CONTROLLED:SLOPE_NOT_CONTROLLED)*MINIMIZING_WINDOW_SLOPE_FACTOR;
     }
 
     refreshTitle(titleText)
@@ -810,14 +818,11 @@ class HyperviewWindow {
 
     onMinimizerTick(n_p, o_p)
     {
-        let n_onGoal = ((n_p===0)||(n_p===1000000));
         this.setDirty();
-        if(n_onGoal)this.focusInhibition = false;
-        if(n_onGoal && this.hyperviewRetained) //We moved in a stable place, last tick
+        if(this.minimizerProgress.onGoal())
         {
-            this.hyperview.waitingMinimizing--;
-            this.hyperviewRetained = false;
-            this.hyperview.notifyWaitingWindowCountChanged();
+            this.focusInhibition = false;
+            this.releaseHyperview();
         }
     }
 
@@ -842,19 +847,30 @@ class HyperviewWindow {
         this.minimizerProgress.setTarget(value)
     }
 
-    onMinimizerPauseChange(value)
+    onMinimizerPauseChange()
     {
-        if(value && this.hyperviewRetained)
+        if(!this.minimizerProgress.paused) this.retainHyperview();
+        else if(this.minimizerProgress.onGoal()) this.releaseHyperview();
+    }
+
+    releaseHyperview()
+    {
+        if(this.hyperviewRetained)
         {
             this.hyperview.waitingMinimizing--;
             this.hyperviewRetained = false;
+            this.hyperview.notifyWaitingWindowCountChanged();
         }
-        else if(!value && !this.hyperviewRetained)
+    }
+
+    retainHyperview()
+    {
+        if(!this.hyperviewRetained)
         {
             this.hyperview.waitingMinimizing++;
             this.hyperviewRetained = true;
+            this.hyperview.notifyWaitingWindowCountChanged();
         }
-        this.hyperview.notifyWaitingWindowCountChanged();
     }
 };
 
@@ -880,10 +896,10 @@ class HyperviewWorkspace {
         this.inFullscreen = false;
         this.stableIndex = hyperWorkspacesStableSequence.toString();
         hyperWorkspacesStableSequence++;
-        this.workspaceHoverProgress = new Progress({autoPause: true, slope: SLOPE_NOT_CONTROLLED, callback: this.onHoverTick.bind(this), stickAroundTarget: 90, stickAroundGoals: 90, goals: [0,1000000], max: 1000000, min: 0});
-        this.destPosXProgress = new Progress({defaultToUndefined: true, float: true, autoPause: true, slope: SLOPE_NOT_CONTROLLED, callback: this.onDestValuesTick.bind(this), stickAroundTarget: 1});
-        this.destPosYProgress = new Progress({defaultToUndefined: true, float: true, autoPause: true, slope: SLOPE_NOT_CONTROLLED, callback: this.onDestValuesTick.bind(this), stickAroundTarget: 1});
-        this.destScaleProgress = new Progress({defaultToUndefined: true, float: true, autoPause: true, slope: SLOPE_NOT_CONTROLLED, callback: this.onDestValuesTick.bind(this), stickAroundTarget: 0.01});
+        this.workspaceHoverProgress = new Progress({slope: SLOPE_NOT_CONTROLLED, callback: this.onHoverTick.bind(this), stickAroundTarget: 90, stickAroundGoals: 90, goals: [0,1000000], max: 1000000, min: 0});
+        this.destPosXProgress = new Progress({defaultToUndefined: true, float: true, slope: SLOPE_NOT_CONTROLLED, callback: this.onDestValuesTick.bind(this), stickAroundTarget: 1});
+        this.destPosYProgress = new Progress({defaultToUndefined: true, float: true, slope: SLOPE_NOT_CONTROLLED, callback: this.onDestValuesTick.bind(this), stickAroundTarget: 1});
+        this.destScaleProgress = new Progress({defaultToUndefined: true, float: true, slope: SLOPE_NOT_CONTROLLED, callback: this.onDestValuesTick.bind(this), stickAroundTarget: 0.01});
         this.windowTickerSelfUnitProgress = interpolate(this.hyperview.windowTicker.unit_progress, 1, this.hyperview.workspaceOverviewTicker.unit_progress);
         this.preventNoWinLabel = false;
         let primary = Main.layoutManager.primaryMonitor;
@@ -1417,11 +1433,10 @@ class Hyperview {
         this.buildWorkspaceMap();
         this.currentWorkspaceIndex = global.screen.get_active_workspace_index();
         this.workspaceChangedId = global.window_manager.connect('switch-workspace', this.protect(this.onWorkspaceChanged));
-        this.windowTicker = new Progress({autoPause: true, slope: SLOPE_CONTROLLED, callback: this.onWindowTick.bind(this), stickAroundTarget: 90, stickAroundGoals: 90, goals: [0, 1000000], max: 1000000, min: 0});
-        this.minimizerProgress = undefined;
-        this.workspaceSwitchTicker = new Progress({autoPause: true, slope: SLOPE_CONTROLLED*SWITCH_CONTROLLED_SLOPE_FACTOR, callback: this.onWorkspaceSwitchTick.bind(this), stickAroundTarget: 3, stickAroundGoals: 3, goals: goals});
-        this.windowSwitchTicker = new ModularProgress({autoPause: true, slope: SLOPE_CONTROLLED*SWITCH_CONTROLLED_SLOPE_FACTOR, callback: this.onWindowSwitchTick.bind(this), stickAroundTarget: 90});
-        this.workspaceOverviewTicker = new Progress({autoPause: true, slope: SLOPE_CONTROLLED, callback: this.onWorkspaceOverviewTick.bind(this), stickAroundTarget: 90, stickAroundGoals: 90, goals: [0,1000000], min: 0, max: 1000000});
+        this.windowTicker = new Progress({slope: SLOPE_CONTROLLED, callback: this.onWindowTick.bind(this), stickAroundTarget: 90, stickAroundGoals: 90, goals: [0, 1000000], max: 1000000, min: 0});
+        this.workspaceSwitchTicker = new Progress({slope: SLOPE_CONTROLLED*SWITCH_CONTROLLED_SLOPE_FACTOR, callback: this.onWorkspaceSwitchTick.bind(this), stickAroundTarget: 3, stickAroundGoals: 3, goals: goals});
+        this.windowSwitchTicker = new ModularProgress({slope: SLOPE_CONTROLLED*SWITCH_CONTROLLED_SLOPE_FACTOR, callback: this.onWindowSwitchTick.bind(this), stickAroundTarget: 90});
+        this.workspaceOverviewTicker = new Progress({slope: SLOPE_CONTROLLED, callback: this.onWorkspaceOverviewTick.bind(this), stickAroundTarget: 90, stickAroundGoals: 90, goals: [0,1000000], min: 0, max: 1000000});
         this.workspaceSwitchTicker.jumpTo(this.currentWorkspaceIndex*1000000);
     }
     
@@ -1528,7 +1543,6 @@ class Hyperview {
         this.workspaceSwitchTicker = null;
         this.windowSwitchTicker.destroy();
         this.windowSwitchTicker = null;
-        this.minimizerProgress = undefined;
         this.workspaceOverviewTicker.destroy();
         this.workspaceOverviewTicker = null;
         global.window_manager.disconnect(this.workspaceChangedId);
@@ -1624,7 +1638,7 @@ class Hyperview {
         this.isFineControlled = value;
         let c_slope = value?SLOPE_CONTROLLED:SLOPE_NOT_CONTROLLED;
         this.windowTicker.options.slope = c_slope;
-        if(this.focusClone !== undefined)this.focusClone.minimizerProgress.options.slope = c_slope;
+        if(this.focusClone !== undefined)this.focusClone.minimizerProgress.options.slope = MINIMIZING_WINDOW_SLOPE_FACTOR*c_slope;
         if(!value && ((this.workspaceSwitchTicker.progress < 0) || (this.workspaceSwitchTicker.progress > (global.screen.get_n_workspaces()-1)*1000000)))this.workspaceSwitchTicker.options.slope = SWITCH_OVERDRAFT_SLOPE;
         else if(value) this.workspaceSwitchTicker.options.slope = c_slope*SWITCH_CONTROLLED_SLOPE_FACTOR;
         else this.workspaceSwitchTicker.options.slope = c_slope*SWITCH_NOT_CONTROLLED_SLOPE_FACTOR;
@@ -1743,7 +1757,7 @@ class Hyperview {
 
     notifyWaitingWindowCountChanged()
     {
-        this.setDirty(DIRT_TYPE.FINE_CONTROL);
+        this.setDirty(DIRT_TYPE.RETAIN_COUNT);
     }
 
     resetFocusWindow()
@@ -2152,7 +2166,7 @@ class GestureManager {
         }
         if(this.logFileStream !== null)
         {
-            if(this.logFileStream.output_stream.write(text, null, this.logFileError) !== -1)
+            if(this.logFileStream.output_stream.write(text, null, this.logFileError) === -1)
             {
                 global.log(this.logFileError)
                 this.logFileStream.close(null)
