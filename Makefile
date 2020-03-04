@@ -12,6 +12,11 @@ install: gestured
 	install -D -o root -g root -m 644 tree/usr/share/dbus-1/system-services/org.aodenis.gestured.service $(DESTDIR)/usr/share/dbus-1/system-services/org.aodenis.gestured.service
 	install -D -o root -g root -m 644 tree/lib/systemd/system/gestured.service $(DESTDIR)/lib/systemd/system/gestured.service
 
+.PHONY: install_extension
+install_extension:
+	install -d -o root -g root $(DESTDIR)/usr/share/cinnamon/extensions/gestures@aodenis
+	install -o root -g root -m 644 gestures@aodenis/* $(DESTDIR)/usr/share/cinnamon/extensions/gestures@aodenis
+
 .PHONY: clean
 clean:
 	rm -f gestured

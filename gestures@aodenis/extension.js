@@ -74,9 +74,6 @@ var hyperWorkspacesStableSequence = 1;
 // TODO Some JS code can go into C one
 // TODO Motion blur maybe
 
-// KNOWN BUG
-// 100% Usage when nothing should run
-
 // VISUAL GLITCHES
 // Good theme for Message when no window (not that easy !)
 // Windows shadows handling
