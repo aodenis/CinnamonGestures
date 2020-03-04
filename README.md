@@ -15,33 +15,19 @@ This software is distributed under GNU GPL v3 license. You may find the full tex
 Installation
 ------------
 
-CinnamonGestures is made of two distinct parts, a daemon (*gestured*) and a Cinnamon extension.
+CinnamonGestures is made of two distinct parts, an event daemon (*gestured*) and a Cinnamon extension.
 
-gestured can be installed as a [debian package](https://github.com/aodenis/CinnamonGestures/releases) or be built. Its purpose is to send libinput's events into DBus system bus, allowing the extension to receive it. It is automatically started by the extension and stops by itself.
-
-The extension is a directory (*gestures@aodenis*) that must be installed in Cinnamon. Once done, you have to activate the extension in Cinnamon (Settings > Extensions).
-
-```
-git clone https://github.com/aodenis/CinnamonGestures
-cd CinnamonGestures
-sudo cinnamon-install-spice extension gestures@aodenis
-```
+Both can be installed at once by a debian package, download it from [Relases tab](https://github.com/aodenis/CinnamonGestures/releases).
 
 Building and installing
 -----------------------
 
-Simple build instructions
 ```
 apt install libudev-dev libdbus-1-dev libinput-dev libstdc++-7-dev
 git clone https://github.com/aodenis/CinnamonGestures
 cd CinnamonGestures
 make
-```
-
-Installation instructions __USE AT YOUR OWN RISKS__
-```
 sudo make install
-sudo cinnamon-install-spice extension gestures@aodenis
 ```
 
 How to use

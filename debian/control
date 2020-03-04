@@ -1,4 +1,4 @@
-Source: gestured
+Source: cinnamon-gestures
 Section: misc
 Priority: optional
 Maintainer: Aodenis <45949528+aodenis@users.noreply.github.com>
@@ -7,9 +7,9 @@ Standards-Version: 4.1.2
 Homepage: https://github.com/aodenis/CinnamonGestures/
 Vcs-Git: https://github.com/aodenis/CinnamonGestures/CinnamonGestures.git
 
-Package: gestured
+Package: cinnamon-gestures
 Architecture: amd64
 Depends: ${shlibs:Depends}, ${misc:Depends}, libstdc++6, libc6, libdbus-1-3, libevdev2, libffi6, libgcc1, libgcrypt20, libglib2.0-0, libgpg-error0, libgudev-1.0-0, libinput10, liblz4-1, liblzma5, libmtdev1, libpcre3, libsystemd0, libudev1, libwacom2, cinnamon, dbus, systemd
-Description: Touchpad gesture daemon
- Daemon sending libinput's touchpad gestures event to DBus' system bus
- Can be summoned via DBus
+Replaces: gestured
+Description: Cinnamon touchpad gestures support
+ Cinnamon touchpad gestures support, containing an event daemon and a cinnamon extension
