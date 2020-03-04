@@ -24,11 +24,11 @@ The extension is a directory (*gestures@aodenis*) that must be installed in Cinn
 ```
 git clone https://github.com/aodenis/CinnamonGestures
 cd CinnamonGestures
-cinnamon-install-spice extension gestures@aodenis
+sudo cinnamon-install-spice extension gestures@aodenis
 ```
 
-Building gestured
------------------
+Building and installing
+-----------------------
 
 Simple build instructions
 ```
@@ -41,7 +41,7 @@ make
 Installation instructions __USE AT YOUR OWN RISKS__
 ```
 sudo make install
-cinnamon-install-spice extension gestures@aodenis
+sudo cinnamon-install-spice extension gestures@aodenis
 ```
 
 How to use
