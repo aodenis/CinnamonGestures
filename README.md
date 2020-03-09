@@ -33,13 +33,13 @@ sudo make install
 How to use
 ----------
 
-Slide three fingers up on your trackpad to display all windows, slide back down to go back to your desktop.
-Slide four fingers up on your trackpad to display all workspaces, slide back down to go back to your desktop.
-In both modes, click a window to activate it.
-In window view, click a window with three fingers to close it.
-In workspace view, click a workspace with three fingers to close it.
-Slide four fingers right and left to switch between workspaces. Slide far enough on the right of a non-empty workspace to create a new one.
-Slide three fingers down to minimize current window.
++ Slide three fingers up on your trackpad to display all windows, slide back down to go back to your desktop.
++ Slide four fingers up on your trackpad to display all workspaces, slide back down to go back to your desktop.
++ In both modes, click a window to activate it.
++ In window view, click a window with three fingers to close it.
++ In workspace view, click a workspace with three fingers to close it.
++ Slide four fingers right and left to switch between workspaces. Slide far enough on the right of a non-empty workspace to create a new one.
++ Slide three fingers down to minimize current window.
 
 Unfinished feature
 ------------------
@@ -70,4 +70,4 @@ If you want to help this project, you can :
 + Star/Watch this repository
 + Report bugs by opening an issue
 + Submit pull requests
-+ Send me some satoshis : bc1qzyr0tl9t40vgdep3ynudrp88fkyqj2ejva7zwh
++ Feel free to send me some spare satoshis : bc1qzyr0tl9t40vgdep3ynudrp88fkyqj2ejva7zwh
