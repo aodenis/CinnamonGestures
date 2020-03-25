@@ -105,9 +105,29 @@ function print_error(e)
         if((last_error.message === e.message) && (last_error.lineNumber === e.lineNumber))return;
     }
     last_error = {message: e.message, lineNumber: e.lineNumber};
+    let additionalError = null;
+    if(mngr !== null)
+    {
+        let str = e.message + "\n" +e.lineNumber.toString() + "\n" + e.stack + "\n";
+        try
+        {
+            mngr.logToFile(str);
+        }
+        catch(e2)
+        {
+            additionalError = e2;
+        }
+    }
     global.logError(e.message);
     global.logError(e.lineNumber);
     global.logWarning(e.stack);
+    if(additionalError !== null)
+    {
+        global.logWarning("--- Additional error when trying to log to file ---");
+        global.logError(additionalError.message);
+        global.logError(additionalError.lineNumber);
+        global.logWarning(additionalError.stack);
+    }
 }
 
 function gTime() //milliseconds
@@ -1987,7 +2007,7 @@ class Hyperview {
         //global.log(symbol)
         if(symbol === 65377) // DEBUG
         {
-            //this.logView("", this.hyperstage);
+            this.logView("", this.hyperstage);
             mngr.engine.logState();
         } //DEBUG
         return true;
@@ -1995,7 +2015,7 @@ class Hyperview {
 
     logView(tabs, actor)
     {
-        global.log(tabs + actor.name + " " + actor.x + " " + actor.y + " " + actor.scale_x + " " + actor.opacity)
+        mngr.logToFile(tabs + actor.name + " " + actor.x + " " + actor.y + " " + actor.scale_x + " " + actor.opacity+"\n")
         //global.log(actor.get_children());
         actor.get_children().forEach(x => this.logView(tabs+"   ", x))
     }
@@ -2155,6 +2175,7 @@ class GestureManager {
             if(this.logFileStream === null)
             {
                 global.log("Error opening file", this.logFileError);
+                return false;
             }
         }
         if(this.logFileStream !== null)
@@ -2164,8 +2185,11 @@ class GestureManager {
                 global.log(this.logFileError)
                 this.logFileStream.close(null)
                 this.logFileStream = null;
+                return false;
             }
+            else return true;
         }
+        return false;
     }
 
     proxyHandleGestureUpdate(proxy, sender, [a, b, c, d])
@@ -2235,7 +2259,8 @@ class GestureManager {
     onGestureStart()
     {
         // 3 and 4
-        if(!this.hyperview.start(true))return;
+        this.hyperview.start(true);
+        if(!this.hyperview.started)return;
         this.startWindowProgress = this.hyperview.windowTicker.progress;
         this.lastWindowSwitchValue = 0;
         this.startWorkspaceSwitchProgress = this.hyperview.workspaceSwitchTicker.progress;
