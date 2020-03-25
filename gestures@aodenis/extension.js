@@ -60,10 +60,11 @@ var hyperWorkspacesStableSequence = 1;
 // TODO Drag windows to other workspaces
 // TODO Expo/Overview inhibition
 // TODO view desktop
-// TODO Improve window switch
 // TODO Multidisplay support
+// TODO Hover fix
 
 // FUTURE
+// TODO Improve window switch
 // TODO keyboard support
 // TODO Windows asking attention
 // TODO ClutterRectangle.set_color is deprecated (but it works)
@@ -78,7 +79,6 @@ var hyperWorkspacesStableSequence = 1;
 // Good theme for Message when no window (not that easy !)
 // Windows shadows handling
 // New windows in mode 1 can be buggy
-// Window switch & always visible windows
 // Windows not updated after workspaces removal
 // Overview window activation
 // Hover fix
@@ -174,7 +174,7 @@ class SettingsManager {
         this.debugMode = false; // Red square when activated
         this.windowSwitchEnabled = false; // An unfinished feature. Working but visually broken
         this.debugLogFileDisabled = !this.devMode; // Barely used, created only if used
-        this.fourFingersCinnamonRestart = !this.devMode; // Put four fingers, move a bit to trigger events but not too much, wait, Cinnamon restarts
+        this.fourFingersCinnamonRestart = this.devMode; // Put four fingers, move a bit to trigger events but not too much, wait, Cinnamon restarts
         this.settings = new Settings.ExtensionSettings(this, "gestures@aodenis");
         //this.settings.bindProperty(Settings.BindingDirection.IN, "dev-mode", "devMode", null, null);
         //this.settings.bindProperty(Settings.BindingDirection.IN, "debug-mode", "debugMode", null, null);
@@ -655,7 +655,6 @@ class HyperviewWindow {
                 else this.actor.set_opacity(255);
             }
         }
-        if(this.hovered)this.checkHovered();
     }
 
     setIdle(value)
@@ -783,19 +782,16 @@ class HyperviewWindow {
         this.actor.set_child_above_sibling(this.title, null);
     }
 
-    checkHovered()
+    refreshHovered()
     {
         if(this.idle)return;
-        if(this.actor.has_pointer)
+        if(!this.actor.has_pointer && this.hovered)
         {
-            this.hovered = true;
-            this.hyperWorkspace.motionEvent();
-            this.hoverProgress.setTarget(1000000);
+            this.leaveEvent();
         }
-        else
+        else if(this.actor.has_pointer && !this.hovered)
         {
-            this.hovered = false;
-            this.hoverProgress.setTarget(0);
+            this.motionEvent();
         }
     }
 
@@ -1491,9 +1487,10 @@ class Hyperview {
             global.overlay_group.set_child_above_sibling(this.debugSquare, null)
         }
         else this.debugSquare = undefined;
-        Main.pushModal(this.hyperstage);
+        this.pushFailed = !Main.pushModal(this.hyperstage);
         global.window_group.hide();
         this.setFineControlled(!!controlled)
+        if(this.pushFailed)this.stop();
     }
 
     stop()
@@ -1504,11 +1501,10 @@ class Hyperview {
 
         //this.windowTicker.setPaused(true);
         
-        Meta.enable_unredirect_for_screen(global.screen); //why am I doing this ?
-        
         // Hide
         this.hyperstage.hide();
-        Main.popModal(this.hyperstage);
+        if(!this.pushFailed)Main.popModal(this.hyperstage);
+
         this.hyperstageConnections.forEach((x)=>this.hyperstage.disconnect(x));
         this.hyperstageConnections = [];
         global.window_group.show();
@@ -2239,7 +2235,7 @@ class GestureManager {
     onGestureStart()
     {
         // 3 and 4
-        this.hyperview.start(true);
+        if(!this.hyperview.start(true))return;
         this.startWindowProgress = this.hyperview.windowTicker.progress;
         this.lastWindowSwitchValue = 0;
         this.startWorkspaceSwitchProgress = this.hyperview.workspaceSwitchTicker.progress;
@@ -2260,6 +2256,7 @@ class GestureManager {
 
     onGestureUpdated(dx, dy)
     {
+        if(!this.hyperview.started)return;
         if(this.currentGesture.nf === 3)
         {
             let wantedTargetY = (this.startWindowProgress - this.currentGesture.y*5000);
@@ -2313,6 +2310,7 @@ class GestureManager {
 
     onGestureDeath()
     {
+        if(!this.hyperview.started)return;
         this.hyperview.setFineControlled(false);
     }
 
