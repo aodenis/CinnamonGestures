@@ -419,7 +419,6 @@ bool GestureServer::handleGestureEvent(libinput_event *event)
 
 void GestureServer::handleInput()
 {
-	//cout << "AYAAA" << endl; //debug
 	skipNextStartInSession = false;
 	libinput_event* event = nullptr;
 	libinput_dispatch(li);

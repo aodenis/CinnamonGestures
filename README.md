@@ -46,11 +46,6 @@ Unfinished feature
 
 You may find settings in Cinnamon's extensions menu and enable there switching between windows by sliding three fingers left and right, an unfinished feature.
 
-Known Bug
----------
-
-This extension sometimes hangs and use 100% CPU. This bug _should_ be fixed, for the fourth time. In this case, restarting Cinnamon is a good way out.
-
 Roadmap
 -------
 

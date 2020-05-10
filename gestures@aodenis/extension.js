@@ -660,7 +660,7 @@ class HyperviewWindow {
                 let sc = interpolate(1, this.minimizedScale, clamp(1-(1-1.1*m_pr)*(1-1.1*m_pr), 0, 1));
                 this.actor.set_scale(sc, sc);
                 this.actor.set_position(interpolate(this.windowLocation.x, this.minimizedLocation.x, m_pr), interpolate(this.windowLocation.y, this.minimizedLocation.y, m_pr*m_pr));
-                this.actor.set_opacity(clamp(255*(1-0.9*m_pr*m_pr), 0, 255));
+                this.actor.set_opacity(clamp(255*(1-1.1*m_pr*m_pr), 0, 255));
             }
             else
             {
