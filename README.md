@@ -17,7 +17,7 @@ Installation
 
 CinnamonGestures is made of two distinct parts, an event daemon (*gestured*) and a Cinnamon extension.
 
-Both can be installed at once by a debian package, download it from [Relases tab](https://github.com/aodenis/CinnamonGestures/releases).
+Both can be installed at once by a debian package, download it from [Releases tab](https://github.com/aodenis/CinnamonGestures/releases).
 
 Building and installing
 -----------------------

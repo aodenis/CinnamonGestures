@@ -552,7 +552,7 @@ class HyperviewWindow {
         }
         this.clone = new Clutter.Group({ reactive: false, name: "clone group" });
         let [pwidth, pheight] = [this.realWindow.width, this.realWindow.height];
-        let clones = WindowUtils.createWindowClone(this.metaWindow, 0, 0, withTransients);
+        let clones = WindowUtils.createWindowClone(this.metaWindow, 0, 0, withTransients === true); //first window in this array is the only one that's not a transient
         for (let i = 0; i < clones.length; i++) {
             let clone = clones[i].actor;
             this.clone.add_actor(clone);
@@ -1084,7 +1084,7 @@ class HyperviewWorkspace {
             new_clone.setIdle(!interesting);
             (interesting?this.views.cloneGroup:this.views.idleCloneGroup).add_actor(new_clone.getActor());
         }
-        else (interesting?this.clones:this.idleClones)[id].refreshClone();
+        else (interesting?this.clones:this.idleClones)[id].refreshClone(true);
         if(interesting)
         {
             if((metaWin.get_maximized() === 3)&&(!metaWin.minimized))this.maximizedAppExists = true;
