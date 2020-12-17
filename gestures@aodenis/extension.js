@@ -61,7 +61,8 @@ var hyperWorkspacesStableSequence = 1;
 // TODO Expo/Overview inhibition
 // TODO view desktop
 // TODO Multidisplay support
-// TODO Hover fix
+// TODO Better vindow titles
+// Smoother
 
 // FUTURE
 // TODO Improve window switch
@@ -502,6 +503,12 @@ class HyperviewWindow {
 
         // Build view
 
+        this.caption = new St.BoxLayout({ style_class: 'window-caption', name: "title"});
+        this.caption._spacing = 0;
+        this.title = new St.Label({ y_align: Clutter.ActorAlign.CENTER });
+        this.title.clutter_text.ellipsize = Pango.EllipsizeMode.END;
+        this.caption.add_actor(this.title);
+
         this.actor = new Clutter.Group({reactive: true, name: "HyperWindow "+this.identifier});
         this.actor.set_pivot_point(0.5, 0.5);
         this.refreshClone(true);
@@ -533,18 +540,12 @@ class HyperviewWindow {
         this.clicked = false;
         this.activated = false;
         this.isFocusClone = false;
-        this.title = undefined;
         this.hyperviewRetained = false;
         this.activeWindowValue = 0;
         this.focusInhibition = false;
     }
 
     refreshClone(withTransients) {
-        if (this.title)
-        {
-            this.title.destroy();
-            this.title = undefined;
-        }
         if (this.clone)
         {
             this.actor.remove_child(this.clone);
@@ -568,11 +569,8 @@ class HyperviewWindow {
         this.connectionIds.forEach((id)=>this.actor.disconnect(id));
         this.metaWindowConnectionsIds.forEach((id)=>this.metaWindow.disconnect(id));
         this.realActorConnectionIds.forEach((id)=>this.realWindow.disconnect(id));
-        if(this.title !== undefined)
-        {
-            this.actor.remove_child(this.title);
-            this.title.destroy();
-        }
+        this.title.destroy();
+        this.caption.destroy();
         this.connectionIds = Array();
         this.realActorConnectionIds = Array();
         this.hoverProgress.destroy();
@@ -583,6 +581,11 @@ class HyperviewWindow {
     getActor()
     {
         return this.actor;
+    }
+
+    getTitleActor()
+    {
+        return this.caption;
     }
 
     onDestPosTick(value)
@@ -639,11 +642,16 @@ class HyperviewWindow {
         let old_destScale = this.destScale;
         this.destScale = (ratio1 < ratio2)?ratio1:ratio2;
         if(this.destScale > 1)this.destScale = 1;
-        if(old_destScale !== this.destScale)this.setDirty();
+        if(old_destScale !== this.destScale)
+        {
+            this.setDirty();
+            this.refreshTitle();
+        }
     }
 
-    onProgressChange()
+    onClean()
     {
+        this.dirty = false;
         let w_pr = this.hyperWorkspace.windowTickerSelfUnitProgress;
         let h_pr = this.hoverProgress.unit_progress;
         let m_pr = this.minimizerProgress.unit_progress;
@@ -671,20 +679,16 @@ class HyperviewWindow {
                 let sc = interpolate(interpolate(this.metaWindow.minimized?this.minimizedScale:1, rotopt.sc, rotadv*rotadv), this.destScale, w_pr)*(1+w_pr*ADDED_RATIO_HOVER*h_pr);
                 this.actor.set_scale(sc, sc);
                 this.actor.set_position(interpolate(this.metaWindow.minimized?this.minimizedLocation.x:this.windowLocation.x, this.destPosXProgress.progress, w_pr)+rotadv*rotopt.dx, interpolate(this.metaWindow.minimized?this.minimizedLocation.y:this.windowLocation.y, this.destPosYProgress.progress, w_pr)+rotadv*rotopt.dy);
+                this.caption.set_position(this.destPosXProgress.progress+(this.realWindow.width/2)-this.caption.width/2, this.destPosYProgress.progress+(this.realWindow.height/2)*(1+sc));
                 if(this.metaWindow.minimized)this.actor.set_opacity(w_pr*255);
                 else this.actor.set_opacity(255);
             }
         }
+        return false;
     }
 
     setIdle(value)
     {
-        if(this.title !== undefined)
-        {
-            this.actor.remove_child(this.title);
-            this.title.destroy();
-            this.title = undefined;
-        }
         this.idle = value;
         if(value)
         {
@@ -782,24 +786,10 @@ class HyperviewWindow {
 
     refreshTitle(titleText)
     {
-        return;
-        if(this.idle)return;
-        let name = titleText||this.metaWindow.title;
-        if (this.title) {
-            this.actor.remove_child(this.title);
-            this.title.remove_constraint_by_name("centered-x");
-            this.title.remove_constraint_by_name("down-y");
-            this.title.destroy();
-        }
-        let title = new St.Label({ style_class: 'window-caption', text: name, name: "title"});
-        this.title = title;
-        title.name = name;
-        title.clutter_text.ellipsize = Pango.EllipsizeMode.END;
-        title._spacing = 0;
-        title.add_constraint_with_name("centered-x", new Clutter.AlignConstraint({source: this.clone, align_axis: Clutter.AlignAxis.X_AXIS, factor: 0.5}));
-        title.add_constraint_with_name("down-y", new Clutter.AlignConstraint({source: this.clone, align_axis: Clutter.AlignAxis.Y_AXIS, factor: 1.0}));
-        this.actor.add_actor(title);
-        this.actor.set_child_above_sibling(this.title, null);
+        this.title.text = titleText||this.metaWindow.title;
+        let [minW, preferred] = this.caption.get_preferred_width(-1);
+        this.caption.width = Math.min(this.realWindow.width*this.destScale, preferred);
+        this.setDirty();
     }
 
     refreshHovered()
@@ -820,13 +810,6 @@ class HyperviewWindow {
         if(this.dirty)return;
         this.dirty = true;
         mngr.engine.registerDirty(2, this);
-    }
-
-    onClean()
-    {
-        this.dirty = false;
-        this.onProgressChange();
-        return false;
     }
 
     onMinimizerTick(n_p, o_p)
@@ -891,6 +874,7 @@ class HyperviewWorkspace {
     // group
     // +--- overlay
     // +--- clones
+    // +--- titles
     // +--- idleClones
     // +--- backgroundGroup
     //      +--- background
@@ -940,6 +924,12 @@ class HyperviewWorkspace {
         cloneGroup.set_position(0, 0);
         this.views.cloneGroup = cloneGroup;
 
+        let titleGroup = new Clutter.Actor({reactive: false, name: "title group"});
+        group.add_actor(titleGroup);
+        titleGroup.set_size(primary.width, primary.height);
+        titleGroup.set_position(0, 0);
+        this.views.titleGroup = titleGroup;
+
         let idleCloneGroup = new Clutter.Actor({reactive: false, name: "idleclone group"});
         group.add_actor(idleCloneGroup);
         idleCloneGroup.set_size(primary.width, primary.height);
@@ -954,7 +944,8 @@ class HyperviewWorkspace {
 
         group.set_child_below_sibling(backgroundGroup, null);
         group.set_child_above_sibling(idleCloneGroup, backgroundGroup);
-        group.set_child_above_sibling(cloneGroup, idleCloneGroup);
+        group.set_child_above_sibling(titleGroup, idleCloneGroup);
+        group.set_child_above_sibling(cloneGroup, titleGroup);
         group.set_child_above_sibling(overlay, cloneGroup);
 
         let background = Meta.BackgroundActor.new_for_screen(global.screen);
@@ -1047,6 +1038,7 @@ class HyperviewWorkspace {
         if(cid in this.clones)
         {
             this.views.cloneGroup.remove_child(this.clones[cid].getActor());
+            this.views.titleGroup.remove_child(this.clones[cid].getTitleActor());
             this.clones[cid].destroy();
             this.clones[cid] = undefined;
             delete this.clones[cid];
@@ -1082,7 +1074,15 @@ class HyperviewWorkspace {
             let new_clone = new HyperviewWindow(this, win);
             (interesting?this.clones:this.idleClones)[id] = new_clone;
             new_clone.setIdle(!interesting);
-            (interesting?this.views.cloneGroup:this.views.idleCloneGroup).add_actor(new_clone.getActor());
+            if(interesting)
+            {
+                this.views.cloneGroup.add_actor(new_clone.getActor());
+                this.views.titleGroup.add_actor(new_clone.getTitleActor());
+            }
+            else
+            {
+                this.views.idleCloneGroup.add_actor(new_clone.getActor());
+            }
         }
         else (interesting?this.clones:this.idleClones)[id].refreshClone(true);
         if(interesting)
@@ -1112,8 +1112,8 @@ class HyperviewWorkspace {
             
             clone.setDestination(Math.round(xCenter*primary.width), Math.round(yCenter*primary.height), scaleX, scaleY);
         });
-        Object.values(this.clones).forEach(v=>v.onProgressChange(true));
-        Object.values(this.idleClones).forEach(v=>v.onProgressChange(true));
+        Object.values(this.clones).forEach(v=>v.onClean());
+        Object.values(this.idleClones).forEach(v=>v.onClean());
     }
 
     sortWindowsByUserTime(clone1, clone2) { //From appSwitcher.js
@@ -1256,6 +1256,8 @@ class HyperviewWorkspace {
             Object.values(this.clones).forEach((x)=>x.setDirty());
             Object.values(this.idleClones).forEach((x)=>x.setDirty());
             this.views.gradient.set_opacity(interpolate(0, 128, pr));
+            this.views.titleGroup.set_opacity(255*Math.max(0, pr*20-19));
+            
             //this.views.background.set_scale(interpolate(1, 0.9, pr), interpolate(1, 0.9, pr));
             //global.log(this.stableIndex, Object.values(this.clones).length)
             if(this.hyperview.windowTicker.progress > this.hyperview.windowTicker.old_progress)this.preventNoWinLabel = false;
@@ -1381,7 +1383,7 @@ class HyperviewWorkspace {
                 this.renewWorkspaceHoverTarget();
                 this.hyperview.onWorkspaceClicked(this);
             }
-            else if(event.get_button() === 2)
+            else if(event.get_button() === 2) // middle-click
             {
                 if((global.screen.get_n_workspaces() > 1) && this.hyperview.workspaceOverviewEnabled) //did that mistake once, not twice
                 {
@@ -2064,13 +2066,13 @@ class Hyperview {
     removeWorkspace(hyperWorkspace)
     {
         let metaWorkspace = hyperWorkspace.metaWorkspace;
-        this.metaWorkspaces = this.metaWorkspaces.filter(el =>(el != metaWorkspace));
-        this.hyperWorkspaces = this.hyperWorkspaces.filter(el =>(el != hyperWorkspace));
+        this.metaWorkspaces = this.metaWorkspaces.filter(el => (el != metaWorkspace));
+        this.hyperWorkspaces = this.hyperWorkspaces.filter(el => (el != hyperWorkspace));
         this.computeWorkspaceDestinations();
         if(metaWorkspace == global.screen.get_active_workspace()) mngr.preventNextDefaultWorkspaceEffect = true;
-        global.screen.remove_workspace(hyperWorkspace.metaWorkspace, global.get_current_time())
-        hyperWorkspace.destroy()
-        this.hyperWorkspaces.filter(x=>x.loaded).forEach(x=>x.syncClones())
+        global.screen.remove_workspace(hyperWorkspace.metaWorkspace, global.get_current_time());
+        hyperWorkspace.destroy();
+        this.hyperWorkspaces.filter(x=>x.loaded).forEach(x=>x.syncClones());
         this.setDirty(DIRT_TYPE.ELEMENT_POSITIONS);
     }
 };
@@ -2208,6 +2210,7 @@ class GestureManager {
         const START_TYPE = 0;
         const STOP_TYPE = 1;
         const UPDATE_TYPE = 2;
+        if(type > 2)return; //skip pinches
         if((type === UPDATE_TYPE) && this.isGesturing) this.updateGesture(dx, dy);
         else if((type === START_TYPE) && (!this.isGesturing))this.startGesture(nfingers, dx, dy);
         else if((type === STOP_TYPE) && this.isGesturing) this.stopGesture();
@@ -2286,7 +2289,7 @@ class GestureManager {
         {
             let wantedTargetY = (this.startWindowProgress - this.currentGesture.y*5000);
             this.hyperview.shouldWindowSwitch = (this.currentGesture.y>0);
-            if(wantedTargetY >= 20000) this.hyperview.dropFocusWindow();
+            if(wantedTargetY >= 20000) this.hyperview.dropFocusWindow(); // we're moving up
             
             if(this.startWindowProgress === 0)
             {
@@ -2314,7 +2317,8 @@ class GestureManager {
         }
         else if(this.currentGesture.nf === 4)
         {
-            if(((this.startWorkspaceOverviewProgress - this.currentGesture.y*5000) <= 200000) && this.canSwitchWorkspaces)
+            let wantedTargetY = (this.startWorkspaceOverviewProgress - this.currentGesture.y*5000);
+            if(((this.startWorkspaceOverviewProgress - this.currentGesture.y*5000) <= 200000) && this.canSwitchWorkspaces) //if canSwitchWorkspace and not too high/down
             {
                 let wantedTargetX = (this.startWorkspaceSwitchProgress - this.currentGesture.x*2500);
                 let offset = (- 5*this.currentGesture.x);
@@ -2323,12 +2327,11 @@ class GestureManager {
                 else if(offset < - 200)direction = "left";
                 this.hyperview.setWorkspaceSwitchTarget(wantedTargetX, direction);
             }
-            else
+            else //vertical movement
             {
                 this.canSwitchWorkspaces = false;
                 this.hyperview.setWorkspaceSwitchTargetToClosestValidOne(); //sorry for that name
             }
-            let wantedTargetY = (this.startWorkspaceOverviewProgress - this.currentGesture.y*5000);
             this.hyperview.setWorkspaceOverviewTarget(wantedTargetY,  (((wantedTargetY>300000)&&(this.currentGesture.y <= 0))?"up":"down"));
         }
     }

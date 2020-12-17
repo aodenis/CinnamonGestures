@@ -387,9 +387,26 @@ bool GestureServer::handleGestureEvent(libinput_event *event)
 {
 	libinput_event_gesture* gesture_event = libinput_event_get_gesture_event(event);
 	uint8_t type = 255;
+	bool isPinch = false;
 	switch(libinput_event_get_type(event))
 	{
 		case LIBINPUT_EVENT_GESTURE_SWIPE_BEGIN:
+		case LIBINPUT_EVENT_GESTURE_SWIPE_END:
+		case LIBINPUT_EVENT_GESTURE_SWIPE_UPDATE:
+			isPinch = false;
+			break;
+		case LIBINPUT_EVENT_GESTURE_PINCH_BEGIN:
+		case LIBINPUT_EVENT_GESTURE_PINCH_END:
+		case LIBINPUT_EVENT_GESTURE_PINCH_UPDATE:
+			isPinch = true;
+			break;
+		default:
+			break;
+	}
+	switch(libinput_event_get_type(event))
+	{
+		case LIBINPUT_EVENT_GESTURE_SWIPE_BEGIN:
+		case LIBINPUT_EVENT_GESTURE_PINCH_BEGIN:
 			if(skipNextStartInSession)
 			{
 				skipNextStartInSession = false;
@@ -398,6 +415,7 @@ bool GestureServer::handleGestureEvent(libinput_event *event)
 			type = 0;
 			break;
 		case LIBINPUT_EVENT_GESTURE_SWIPE_END:
+		case LIBINPUT_EVENT_GESTURE_PINCH_END:
 			if(libinput_event_gesture_get_cancelled(gesture_event) == true)
 			{
 				skipNextStartInSession = true;
@@ -407,13 +425,15 @@ bool GestureServer::handleGestureEvent(libinput_event *event)
 			type = 1;
 			break;
 		case LIBINPUT_EVENT_GESTURE_SWIPE_UPDATE:
+		case LIBINPUT_EVENT_GESTURE_PINCH_UPDATE:
 			type = 2;
 			break;
 		default:
 			break;
 	}
 	skipNextStartInSession = false;
-	sendGestureEvent(type, libinput_event_gesture_get_finger_count(gesture_event), libinput_event_gesture_get_dx(gesture_event), libinput_event_gesture_get_dy(gesture_event));
+	if(isPinch) sendGestureEvent(3+type, libinput_event_gesture_get_finger_count(gesture_event), libinput_event_gesture_get_scale(gesture_event), libinput_event_gesture_get_angle_delta(gesture_event));
+	else sendGestureEvent(type, libinput_event_gesture_get_finger_count(gesture_event), libinput_event_gesture_get_dx(gesture_event), libinput_event_gesture_get_dy(gesture_event));
 	return true;
 }
 
@@ -429,6 +449,9 @@ void GestureServer::handleInput()
 			case LIBINPUT_EVENT_GESTURE_SWIPE_BEGIN:
 			case LIBINPUT_EVENT_GESTURE_SWIPE_END:
 			case LIBINPUT_EVENT_GESTURE_SWIPE_UPDATE:
+			case LIBINPUT_EVENT_GESTURE_PINCH_BEGIN:
+			case LIBINPUT_EVENT_GESTURE_PINCH_END:
+			case LIBINPUT_EVENT_GESTURE_PINCH_UPDATE:
 				// cout << "[*] Gesture event" << endl;
 				handleGestureEvent(event);
 				break;
