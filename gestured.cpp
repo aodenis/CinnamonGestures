@@ -20,8 +20,6 @@
 #include <iostream>
 #include <cstring>
 #include <chrono>
-#include <functional>
-#include <thread>
 #include <map>
 
 #include <fcntl.h>
