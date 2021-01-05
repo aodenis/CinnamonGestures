@@ -3,7 +3,7 @@ SHELL= /bin/sh
 all: gestured
 
 gestured: gestured.cpp
-	g++ -o gestured gestured.cpp -std=c++17 -Wall -O2 `pkg-config --libs --cflags libudev libinput dbus-1`
+	g++ -o gestured gestured.cpp -std=c++17 -O3 -Wall `pkg-config --libs --cflags libudev libinput dbus-1`
 
 .PHONY: install
 install: gestured

@@ -11,7 +11,7 @@
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// along with this program.  Ifnot, see <https://www.gnu.org/licenses/>.
 
 #include <dbus/dbus.h>
 #include <libudev.h>
@@ -21,6 +21,7 @@
 #include <cstring>
 #include <chrono>
 #include <map>
+#include <vector>
 
 #include <fcntl.h>
 #include <sys/poll.h>
@@ -31,7 +32,7 @@
 
 using namespace std;
 
-#define MILLISECONDS_BEFORE_DEATH 10000
+#define MILLISECONDS_BEFORE_DEATH 20000 //10000
 #define POLL_WAIT_TIME 5000
 
 static int open_restricted(const char *path, int flags, void *user_data)
@@ -56,11 +57,11 @@ public:
 	GestureServer();
 	~GestureServer();
 	int run();
-	int getExitCode() const;
 	bool isGood() const;
 	DBusHandlerResult onMessage(DBusMessage *message);
 
 	dbus_bool_t addWatch(DBusWatch* watch);
+	void toggleWatch(DBusWatch* watch);
 	void removeWatch(DBusWatch* watch);
 
 private:
@@ -81,12 +82,12 @@ private:
     chrono::system_clock::time_point lastKA;
     libinput* li;
     bool goodbit;
-    pollfd* pollfdArray;
-    DBusWatch** watchArray;
-    unsigned int pollfdArraySize;
+    bool fullRebuildNeeded;
     pollfd libinputPollfd;
     bool skipNextStartInSession;
     int16_t fingerCountForLatentStop;
+    vector<pollfd> pollfdArray;
+	vector<DBusWatch*> watchArray;
 };
 
 dbus_bool_t _add(DBusWatch* w, void* d)
@@ -94,6 +95,10 @@ dbus_bool_t _add(DBusWatch* w, void* d)
 	return ((GestureServer*)d)->addWatch(w);
 }
 
+void _toggle(DBusWatch* w, void* d)
+{
+	return ((GestureServer*)d)->toggleWatch(w);
+}
 
 void _remove(DBusWatch* w, void* d)
 {
@@ -133,7 +138,7 @@ const char* descriptor = "<!DOCTYPE node PUBLIC \"-//freedesktop//DTD D-BUS Obje
 
 DBusHandlerResult GestureServer::onMessage(DBusMessage* msg)
 {
-	if (dbus_message_is_method_call(msg, "org.aodenis.gestured", "StayAlive")) {
+	if(dbus_message_is_method_call(msg, "org.aodenis.gestured", "StayAlive")) {
      	lastKA = chrono::system_clock::now();
 		DBusMessage* msg2 = dbus_message_new_method_return(msg);
 		if(msg2 == nullptr)
@@ -147,7 +152,7 @@ DBusHandlerResult GestureServer::onMessage(DBusMessage* msg)
      	// cout << "[*] Keep Alive message received..." << endl;
 		return DBUS_HANDLER_RESULT_HANDLED;
 
-  	} else if (dbus_message_is_method_call(msg, "org.freedesktop.DBus.Introspectable", "Introspect")) {
+  	} else if(dbus_message_is_method_call(msg, "org.freedesktop.DBus.Introspectable", "Introspect")) {
 		DBusMessage* msg2 = dbus_message_new_method_return(msg);
 		if(msg2 == nullptr)
 		{
@@ -157,7 +162,7 @@ DBusHandlerResult GestureServer::onMessage(DBusMessage* msg)
 		}
 		DBusMessageIter args;
 		dbus_message_iter_init_append(msg2, &args);
-		if (!dbus_message_append_args (msg2,
+		if(!dbus_message_append_args (msg2,
 	                          DBUS_TYPE_STRING, &descriptor,
 	                          DBUS_TYPE_INVALID))
 		{
@@ -174,48 +179,48 @@ DBusHandlerResult GestureServer::onMessage(DBusMessage* msg)
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
 
-GestureServer::GestureServer() : exitCode(-1), watches(), msg(nullptr), conn(nullptr), li(nullptr), goodbit(false), pollfdArray(nullptr), watchArray(nullptr), pollfdArraySize(0)
+GestureServer::GestureServer() : exitCode(-1), watches(), msg(nullptr), conn(nullptr), li(nullptr), goodbit(false), fullRebuildNeeded(true)
 {
 	goodbit = false;
 	dbus_error_init(&err);
     conn = dbus_bus_get(DBUS_BUS_SYSTEM, &err);
-    if (dbus_error_is_set(&err)) {
+    if(dbus_error_is_set(&err)) {
         cerr << "[!] Connection error " << err.message << endl;
         conn = nullptr;
         return;
     }
 
-    if (conn == nullptr) {
+    if(conn == nullptr) {
         cerr << "[!] Unknown connection error" << endl;
         return;
     }
- 	
-	if (!dbus_connection_set_watch_functions(conn, _add, _remove, nullptr, this, nullptr)) {
+
+	if(!dbus_connection_set_watch_functions(conn, _add, _remove, _toggle, this, nullptr)) {
 		cerr << "[!] Unable to set watch function" << endl;
 		return;
 	}
 
-	dbus_bus_add_match(conn, 
+	dbus_bus_add_match(conn,
          "type='method',interface='org.aodenis.gestured'",
          nullptr);
-	dbus_bus_add_match(conn, 
+	dbus_bus_add_match(conn,
          "type='method',interface='org.freedesktop.DBus.Introspectable'",
          nullptr);
 
 	dbus_connection_try_register_object_path(conn, "/", &gs_vtable, this, &err);
-	if (dbus_error_is_set(&err)) {
+	if(dbus_error_is_set(&err)) {
         cerr << "Error registering object " << err.message << endl;
         return;
     }
-    
+
 	/*dbus_connection_try_register_fallback(conn, "/", &gs_vtable, this, &err);
-	if (dbus_error_is_set(&err)) {
+	if(dbus_error_is_set(&err)) {
         cerr << "Error registering fallback object " << err.message << endl;
         return;
     }*/
 
     dbus_bus_request_name(conn, "org.aodenis.gestured", DBUS_NAME_FLAG_REPLACE_EXISTING, &err);
-    if (dbus_error_is_set(&err)) {
+    if(dbus_error_is_set(&err)) {
         cerr << "Name Error " << err.message << endl;
         return;
     }
@@ -251,12 +256,6 @@ GestureServer::GestureServer() : exitCode(-1), watches(), msg(nullptr), conn(nul
 	goodbit = true;
 }
 
-
-int GestureServer::getExitCode() const
-{
-	return exitCode;
-}
-
 bool GestureServer::isGood() const
 {
 	return goodbit;
@@ -264,8 +263,8 @@ bool GestureServer::isGood() const
 
 GestureServer::~GestureServer()
 {
-	if(pollfdArray != nullptr)delete[] pollfdArray;
-	if(watchArray != nullptr)delete[] watchArray;
+	pollfdArray.clear();
+	watchArray.clear();
 	if(conn)dbus_connection_unref(conn);
 	conn = nullptr;
 	if(li)libinput_unref(li);
@@ -278,53 +277,58 @@ dbus_bool_t GestureServer::addWatch(DBusWatch *watch)
 	short cond = POLLHUP | POLLERR;
 	int fd = dbus_watch_get_unix_fd(watch);
 	unsigned int flags = dbus_watch_get_flags(watch);
-	
-	if (flags & DBUS_WATCH_READABLE) cond |= POLLIN;
-	if (flags & DBUS_WATCH_WRITABLE) cond |= POLLOUT;
 
-	watches[watch].fd = fd;
-	watches[watch].events = cond;
+	if(flags & DBUS_WATCH_READABLE) cond |= POLLIN;
+	if(flags & DBUS_WATCH_WRITABLE) cond |= POLLOUT;
+
+	pollfd npfd = {
+		.fd = fd,
+		.events = cond
+	};
+	watches[watch] = npfd;
+	fullRebuildNeeded = true;
 	return 1;
+}
+
+void GestureServer::toggleWatch(DBusWatch *watch)
+{
+	fullRebuildNeeded = true;
 }
 
 void GestureServer::removeWatch(DBusWatch *watch)
 {
-	try
+	if(watches.erase(watch))
 	{
-		watches.erase(watches.find(watch));
-	} catch(const out_of_range& err)
-	{
+		fullRebuildNeeded = true;
+		rebuildPollfdArray();
 	}
-	rebuildPollfdArray();
 }
 
 void GestureServer::rebuildPollfdArray()
 {
-	if(pollfdArray != nullptr)delete[] pollfdArray;
-	if(watchArray != nullptr)delete[] watchArray;
-	pollfdArray = new pollfd[watches.size()+1];
-	watchArray = new DBusWatch*[watches.size()+1];
-	int i = 0;
-	memcpy(pollfdArray+(i++), &libinputPollfd, sizeof(pollfd));
-	for(auto& a : watches)
+	if(fullRebuildNeeded)
 	{
-		if(dbus_watch_get_enabled(a.first))
+		pollfdArray.clear();
+		watchArray.clear();
+		pollfdArray.push_back(libinputPollfd);
+		watchArray.push_back(nullptr);
+		for(auto& [watch, pfd] : watches)
 		{
-			watchArray[i] = a.first;
-			memcpy(pollfdArray+(i), &a.second, sizeof(pollfd));
-			i++;
+			if(dbus_watch_get_enabled(watch))
+			{
+				watchArray.push_back(watch);
+				pollfdArray.push_back(pfd);
+			}
 		}
+		fullRebuildNeeded = false;
 	}
-	pollfdArraySize = i;
 	resetPollfdArray();
 }
 
 void GestureServer::resetPollfdArray()
 {
-	for(unsigned int i = 0; i < pollfdArraySize; i++)
-	{
-		pollfdArray[i].revents = 0;
-	}
+	for(unsigned int i = 0; i < pollfdArray.size(); i++)
+		pollfdArray.at(i).revents = 0;
 }
 
 int main()
@@ -353,7 +357,7 @@ void GestureServer::sendGestureEvent(uint8_t type, int16_t fingerCount, double d
 	DBusMessageIter args;
 
 	msg = dbus_message_new_signal("/", "org.aodenis.gestured", "UpdateGesture");
-	if (msg == nullptr) {
+	if(msg == nullptr) {
 		cerr << "[!] Message creation failed" << endl;
 		exitCode = 5;
 		return;
@@ -361,7 +365,7 @@ void GestureServer::sendGestureEvent(uint8_t type, int16_t fingerCount, double d
 
 	// append arguments
 	dbus_message_iter_init_append(msg, &args);
-	if (!dbus_message_append_args (msg,
+	if(!dbus_message_append_args (msg,
                           DBUS_TYPE_BYTE, &type,
                           DBUS_TYPE_INT16, &fingerCount,
                           DBUS_TYPE_DOUBLE, &dx,
@@ -373,7 +377,7 @@ void GestureServer::sendGestureEvent(uint8_t type, int16_t fingerCount, double d
 		return;
 	}
 
-	if (!dbus_connection_send (conn, msg, nullptr)) {
+	if(!dbus_connection_send (conn, msg, nullptr)) {
 		cerr << "[!] Message send failed" << endl;
 		exitCode = 5;
 	}
@@ -430,8 +434,22 @@ bool GestureServer::handleGestureEvent(libinput_event *event)
 			break;
 	}
 	skipNextStartInSession = false;
-	if(isPinch) sendGestureEvent(3+type, libinput_event_gesture_get_finger_count(gesture_event), libinput_event_gesture_get_scale(gesture_event), libinput_event_gesture_get_angle_delta(gesture_event));
-	else sendGestureEvent(type, libinput_event_gesture_get_finger_count(gesture_event), libinput_event_gesture_get_dx(gesture_event), libinput_event_gesture_get_dy(gesture_event));
+	uint16_t fingerCount = libinput_event_gesture_get_finger_count(gesture_event);
+	double x;
+	double y;
+	if(isPinch)
+	{
+		type += 3;
+		x = libinput_event_gesture_get_scale(gesture_event);
+		y = libinput_event_gesture_get_angle_delta(gesture_event);
+	}
+	else
+	{
+		x = libinput_event_gesture_get_dx(gesture_event);
+		y = libinput_event_gesture_get_dy(gesture_event);
+	}
+	libinput_event_destroy(event);
+	sendGestureEvent(type, fingerCount, x, y);
 	return true;
 }
 
@@ -447,58 +465,89 @@ void GestureServer::handleInput()
 			case LIBINPUT_EVENT_GESTURE_SWIPE_BEGIN:
 			case LIBINPUT_EVENT_GESTURE_SWIPE_END:
 			case LIBINPUT_EVENT_GESTURE_SWIPE_UPDATE:
-			case LIBINPUT_EVENT_GESTURE_PINCH_BEGIN:
-			case LIBINPUT_EVENT_GESTURE_PINCH_END:
-			case LIBINPUT_EVENT_GESTURE_PINCH_UPDATE:
+			// case LIBINPUT_EVENT_GESTURE_PINCH_BEGIN:
+			// case LIBINPUT_EVENT_GESTURE_PINCH_END:
+			// case LIBINPUT_EVENT_GESTURE_PINCH_UPDATE:
 				// cout << "[*] Gesture event" << endl;
 				handleGestureEvent(event);
+				if(skipNextStartInSession)sendGestureEvent(1, fingerCountForLatentStop, 0, 0);
 				break;
 			default:
+        		libinput_event_destroy(event);
 				break;
 		}
-        libinput_event_destroy(event);
 	}
-	if(skipNextStartInSession)sendGestureEvent(1, fingerCountForLatentStop, 0, 0);
-	skipNextStartInSession = false;
 }
 
 int GestureServer::run()
 {
 	lastKA = chrono::system_clock::now();
-	while (true) {	
-		rebuildPollfdArray();
-		if(poll(pollfdArray, pollfdArraySize, POLL_WAIT_TIME) < 0) {
-			if(errno == EINTR)continue;
+	pollfd* _pollfdArray = nullptr; 
+	unsigned int pollfdArraySize = 0;
+	int32_t pollret = 0;
+	uint32_t loop = 0;
+	while (true) {
+		if(fullRebuildNeeded)
+		{
+			rebuildPollfdArray();
+			_pollfdArray = &(pollfdArray[0]);
+			pollfdArraySize = pollfdArray.size();
+		}
+
+		pollret = poll(_pollfdArray, pollfdArraySize, POLL_WAIT_TIME);
+		if(pollret < 0)
+		{
+			if(errno == EINTR) continue;
 			cerr << "[?] Error while polling " << strerror(errno) << endl;
 			exitCode = 1;
 			break;
 		}
 
-		bool dbusEvent = false;
-		for (unsigned int i = 0; i < pollfdArraySize; ++i) {
-			if (pollfdArray[i].revents) {
-				if(!i)handleInput();
-				else
+		if(pollret and _pollfdArray->revents)
+		{
+			handleInput();
+			_pollfdArray->revents = 0;
+			pollret--;
+		}
+
+		if(pollret)
+		{
+			bool dbusEvent = false;
+			for(unsigned int i = 1; i < pollfdArraySize; i++)
+			{
+				if(_pollfdArray[i].revents)
 				{
+					decltype(pollfd::revents) events = _pollfdArray[i].revents;
 					unsigned int flags = 0;
-        			if(pollfdArray[i].revents & POLLIN)flags |= DBUS_WATCH_READABLE;
-        			if(pollfdArray[i].revents & POLLOUT)flags |= DBUS_WATCH_WRITABLE;
-        			if(pollfdArray[i].revents & POLLHUP)flags |= DBUS_WATCH_HANGUP;
-        			if(pollfdArray[i].revents & POLLERR)flags |= DBUS_WATCH_ERROR;
-					dbus_watch_handle(watchArray[i], flags);
+	        		if(events & POLLIN)flags |= DBUS_WATCH_READABLE;
+	        		if(events & POLLOUT)flags |= DBUS_WATCH_WRITABLE;
+	        		if(events & POLLHUP)flags |= DBUS_WATCH_HANGUP;
+	        		if(events & POLLERR)flags |= DBUS_WATCH_ERROR;
+	        		_pollfdArray[i].revents = 0;
+					if(dbus_watch_handle(watchArray[i], flags) == FALSE)
+					{
+						cout << "out of memory" << endl;
+					}
 					dbusEvent = true;
+					if((--pollret) == 0)break;
 				}
 			}
+			if(dbusEvent)
+				handleDBusInput();
 		}
-		if(dbusEvent)handleDBusInput();
-		if(exitCode != -1)break;
-		if(chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now()-lastKA).count() >= MILLISECONDS_BEFORE_DEATH)
-		{
-			cout << "[*] No listener, quitting" << endl;
-			exitCode = 0;
+
+		if(exitCode != -1)
 			break;
+		if(++loop == 1000)
+		{
+			if(chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now()-lastKA).count() >= MILLISECONDS_BEFORE_DEATH)
+			{
+				cout << "[*] No listener, quitting" << endl;
+				exitCode = 0;
+				break;
+			}
+			loop = 0;
 		}
 	}
-
-	return getExitCode();
+	return exitCode;
 }
